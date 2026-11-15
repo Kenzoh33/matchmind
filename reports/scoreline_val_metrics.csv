@@ -1,0 +1,10 @@
+table,model,accuracy,log_loss,brier,exact_hit,score_mae,xg_mae,score_log_loss
+hda,home_baseline,0.4256,1.0756,0.6515,,,,
+hda,bookmaker,0.5443,0.9639,0.5725,,,,
+hda,logreg,0.5362,0.9874,0.5882,,,,
+hda,xgboost,0.5334,0.9830,0.5852,,,,
+hda,scoreline,0.5443,0.9760,0.5811,,,,
+scoreline,always_1-1,,,,0.1323,0.8813,,
+scoreline,most_common_1-1,,,,0.1323,0.8813,,
+scoreline,train_score_freqs,,,,0.1323,0.8813,,2.9956
+scoreline,scoreline,,,,0.1255,0.8847,0.8780,2.8670
