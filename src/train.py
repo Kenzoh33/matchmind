@@ -22,7 +22,7 @@ TRAIN_SEASONS = ["2019-20", "2020-21", "2021-22", "2022-23", "2023-24"]
 VAL_SEASONS = ["2024-25"]
 TEST_SEASONS = ["2025-26"]
 STATS = ["gf", "ga", "pts", "sot_for", "sot_against"]
-FEATURES = [f"{p}_{s}" for p in ("home", "away", "diff") for s in STATS]
+FEATURES = [f"{p}_{s}" for p in ("home", "away", "diff") for s in STATS] + ["home_elo", "away_elo", "diff_elo"]
 CLASSES = [0, 1, 2]  # H, D, A
 XGB_GRID = {"max_depth": [2, 3, 4], "learning_rate": [0.03, 0.1], "min_child_weight": [1, 5]}
 

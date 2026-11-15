@@ -15,6 +15,61 @@ TARGET_MAP = {"H": 0, "D": 1, "A": 2}
 ID_COLS = ["league", "season", "Date", "HomeTeam", "AwayTeam"]
 EXTRA_COLS = ["FTHG", "FTAG", "AvgH", "AvgD", "AvgA"]  # kept for later; NOT features
 SEED = 0
+ELO_START = 1500.0  # neutral rating for every team in the first season
+ELO_K = 20.0        # how far one result moves a rating
+ELO_HOME = 60.0     # home-advantage bonus, used only in the expected score
+ELO_CARRY = 0.8     # share of last season's rating kept over the summer
+ELO_COLS = ["home_elo", "away_elo", "diff_elo"]
+
+
+def add_elo(df):
+    """Pre-match Elo ratings, computed per league in date order.
+
+    Each match gets both teams' ratings BEFORE it is played, then the ratings update from
+    its result. Matches with no result (FTR missing, e.g. fixtures) get ratings but do not
+    update them. A team new to the league (promoted, or back after a gap) starts at the mean
+    rating of the teams that left the league that summer.
+    """
+    df = df.copy()
+    df["home_elo"] = np.nan
+    df["away_elo"] = np.nan
+    for _, lg in df.groupby("league"):
+        ratings, prev_teams = {}, None
+        for _, s in lg.groupby("season", sort=True):  # "2019-20" < "2020-21" < ...
+            teams = set(s["HomeTeam"]) | set(s["AwayTeam"])
+            if prev_teams is None:
+                start = {t: ELO_START for t in teams}
+            else:
+                left = prev_teams - teams
+                new_r = np.mean([ratings[t] for t in left]) if left else ELO_START
+                start = {t: ratings[t] if t in prev_teams else new_r for t in teams}
+            ratings = {t: ELO_CARRY * r + (1 - ELO_CARRY) * ELO_START for t, r in start.items()}
+            prev_teams = teams
+            for row in s.sort_values("Date").itertuples():
+                rh, ra = ratings[row.HomeTeam], ratings[row.AwayTeam]
+                df.at[row.Index, "home_elo"] = rh
+                df.at[row.Index, "away_elo"] = ra
+                if pd.isna(row.FTR):
+                    continue
+                expected_home = 1 / (1 + 10 ** ((ra - (rh + ELO_HOME)) / 400))
+                actual_home = {"H": 1.0, "D": 0.5, "A": 0.0}[row.FTR]
+                delta = ELO_K * (actual_home - expected_home)
+                ratings[row.HomeTeam] = rh + delta
+                ratings[row.AwayTeam] = ra - delta
+    df["diff_elo"] = df["home_elo"] - df["away_elo"]
+    return df
+
+
+def check_elo_no_leakage(df, n=50):
+    """Hide every result on or after a match's date; its pre-match Elo must not change."""
+    rng = np.random.default_rng(SEED)
+    for i in rng.choice(len(df), size=min(n, len(df)), replace=False):
+        r = df.iloc[i]
+        hidden = df.drop(columns=ELO_COLS).copy()
+        hidden.loc[hidden["Date"] >= r["Date"], "FTR"] = np.nan
+        re = add_elo(hidden).loc[r.name]
+        for c in ELO_COLS:
+            assert np.isclose(re[c], r[c]), (r["HomeTeam"], r["Date"], c)
 
 
 def to_long(df):
@@ -67,6 +122,8 @@ def check_no_leakage(long, n=50):
 def main():
     df = pd.read_csv(IN_PATH, parse_dates=["Date"])
     df["match_id"] = df.index
+    df = add_elo(df)
+    check_elo_no_leakage(df)
 
     long = to_long(df)
     assert not long.duplicated(["team", "Date"]).any(), "a team plays twice on one date"
@@ -82,7 +139,7 @@ def main():
     for s in STATS:
         out[f"diff_{s}"] = out[f"home_{s}"] - out[f"away_{s}"]
 
-    feat_cols = [f"{p}_{s}" for p in ("home", "away", "diff") for s in STATS]
+    feat_cols = [f"{p}_{s}" for p in ("home", "away", "diff") for s in STATS] + ELO_COLS
     n_in = len(out)
     out = out.dropna(subset=feat_cols)
     out["y"] = out["FTR"].map(TARGET_MAP)
@@ -94,7 +151,7 @@ def main():
 
     print(f"Matches in: {n_in}, kept: {len(out)}, "
           f"dropped (team with < {WINDOW} prior matches in spell): {n_in - len(out)}")
-    print("Leakage check passed (brute-force recompute of 50 random rows).")
+    print("Leakage check passed (brute-force recompute of 50 random rows, form and Elo).")
     print(out.groupby(["league", "season"]).size().to_string())
     print(f"-> {OUT_PATH}")
 

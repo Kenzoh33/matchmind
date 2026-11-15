@@ -13,7 +13,7 @@ import requests
 from xgboost import XGBClassifier
 
 from download import LEAGUES, RAW_DIR
-from features import STATS, add_form, add_spells, to_long
+from features import STATS, add_elo, add_form, add_spells, to_long
 from train import (FEATURES, MODEL_DIR, SEED, TEST_SEASONS, TRAIN_SEASONS, VAL_SEASONS,
                    bookmaker_probs, class_freqs, evaluate, home_baseline_probs, make_logreg)
 
@@ -78,6 +78,7 @@ def fixture_features(matches, fx):
     allm = pd.concat([matches, fx.assign(is_fixture=True)], ignore_index=True)
     allm["is_fixture"] = allm["is_fixture"].fillna(False).astype(bool)
     allm["match_id"] = allm.index
+    allm = add_elo(allm)  # fixtures have no FTR, so they get ratings but never update them
     long = add_form(add_spells(to_long(allm)))
 
     form_cols = [f"form_{s}" for s in STATS]
