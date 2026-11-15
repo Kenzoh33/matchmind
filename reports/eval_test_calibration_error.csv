@@ -1,0 +1,16 @@
+split,model,outcome,ece
+test,home_baseline,H,0.0140
+test,home_baseline,D,0.0095
+test,home_baseline,A,0.0235
+test,bookmaker,H,0.0470
+test,bookmaker,D,0.0347
+test,bookmaker,A,0.0432
+test,logreg,H,0.0404
+test,logreg,D,0.0332
+test,logreg,A,0.0496
+test,xgboost,H,0.0445
+test,xgboost,D,0.0589
+test,xgboost,A,0.0548
+test,scoreline,H,0.0434
+test,scoreline,D,0.0300
+test,scoreline,A,0.0478
